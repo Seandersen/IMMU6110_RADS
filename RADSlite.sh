@@ -1,3 +1,5 @@
+#!/bin/sh
+
 translate( ){
     mkdir genomes_translated_${samplename}/
     cd genomes_${samplename}/
