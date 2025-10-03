@@ -1,102 +1,5 @@
 #!/bin/sh
 
-translate( ){
-    mkdir genomes_translated_${samplename}/
-    cd genomes_${samplename}/
-    files=( ./*.fna )
-    for i in "${files[@]}"
-    do
-        prodigal \
-        -p meta \
-        -i ${i} \
-        -o ../genomes_translated_${samplename}/${i}prodigal.txt \
-        -a ../genomes_translated_${samplename}/${i}translated.faa
-    done
-    cd ../
-    echo "genomes translated"
-}
-
-makedbs( ){
-    mkdir diamonddbs_${samplename}/
-    cd genomes_translated_${samplename}/
-    files=( ./*.faa )
-    for i in "${files[@]}"
-    do
-        diamond makedb \
-        --in ${i} \
-        --db ../diamonddbs_${samplename}/${i}.db \
-        --threads 30
-    done
-    cd ../
-}
-
-blast( ){
-    mkdir blast_results_30_${samplename}/
-    cd diamonddbs_${samplename}
-    files=( *.dmnd )
-    for i in "${files[@]}"
-    do
-        if [ ! -f ../blast_results_30_$samplename/EFB0058_blast_${i}.txt ]; then
-	        diamond blastp -d ${i} --query ../$query --threads 40 --out ../blast_results_30_$samplename/EFB0058_blast_${i}.txt --outfmt 6 qseqid sseqid length nident --max-target-seqs 0 --id 30
-        fi
-    done
-    cd ../
-
-    for i in $(ls blast_results_30_${samplename}/)
-    do
-        cat blast_results_30_${samplename}/${i} >> master$samplename.txt
-    done
-}
-
-extractcontigs ( ){
-    mkdir EFB0058_ORFS_$samplename/
-    mkdir EFB0058_flanks_$samplename/
-    mkdir bedfiles_$samplename/
-    mkdir contigs_$samplename/
-    mkdir EFB0058_formatted_coordinates_$samplename/
-    mkdir EFB0058_final_coordinates_$samplename/
-
-
-    for i in $(ls genomes_$samplename/)
-    do
-        if [ -s blast_results_30_$samplename/EFB0058_blast_${i}translated.faa.db.dmnd.txt ]; then
-            echo ${i}
-            cut -f2 blast_results_30_$samplename/EFB0058_blast_${i}translated.faa.db.dmnd.txt > EFB0058_ORFS_$samplename/${i}_EFB0058_ORFs.txt
-            echo "ORF IDs extracted"
-            seqkit grep -f EFB0058_ORFS_$samplename/${i}_EFB0058_ORFs.txt genomes_translated_$samplename/${i}translated.faa | seqkit seq -n > EFB0058_ORFS_$samplename/${i}_EFB0058_hits_coordinates.txt
-            echo "Coordinates extracted"
-            awk 'BEGIN{OFS="\t"} {F="#"} {up=$3; down=$5; if (up>down) print down, up; else print up, down}' EFB0058_ORFS_$samplename/${i}_EFB0058_hits_coordinates.txt > EFB0058_formatted_coordinates_$samplename/${i}_EFB0058_formatted_coordinates.txt
-            awk -v upint=$upint -v downint=$downint 'BEGIN{OFS="\t"} {up=$1-upint; down=$2+downint; if (up>0) print up, down; else print 0, down}' EFB0058_formatted_coordinates_$samplename/${i}_EFB0058_formatted_coordinates.txt > EFB0058_final_coordinates_$samplename/${i}_EFB0058_final_coordinates.txt
-            echo "Coordinates formatted"
-            cut -f 2 blast_results_30_$samplename/EFB0058_blast_${i}translated.faa.db.dmnd.txt | cut -f 1 -d "_" > EFB0058_flanks_$samplename/${i}_EFB0058_contigs.txt
-            echo "Contig names extracted"
-            paste EFB0058_flanks_$samplename/${i}_EFB0058_contigs.txt EFB0058_final_coordinates_$samplename/${i}_EFB0058_final_coordinates.txt > bedfiles_$samplename/${i}.bed
-            echo "Bed file created"
-            seqkit subseq --bed bedfiles_$samplename/${i}.bed genomes_$samplename/${i} > contigs_$samplename/${i}_EFB0058_contigs.fna
-            echo "Contigs created for ${i} with flanks $upint up and $downint down"
-        else
-            echo "File ${i} is empty, skipping..."
-        fi
-    done
-}
-
-contigorfprocessing( ){
-    files=(contigs_$samplename/*.fna)
-    for i in "${files[@]}"
-    do
-        cat ${i} >> allcontigsconcatenated_$samplename.fna
-    done
-
-    seqkit seq -m 50 allcontigsconcatenated_$samplename.fna > allcontigsconcatenated_filtered_$samplename.fna
-    prodigal \
-    -p meta \
-    -i allcontigsconcatenated_filtered_$samplename.fna \
-    -o allcontigsconcatenated_$samplename.txt \
-    -a allcontigsconcatenated_$samplename.faa
-    sed 's/*//g' allcontigsconcatenated_$samplename.faa > interposcaninput_$samplename.faa
-    bash my_interproscan/interproscan-*/interproscan.sh -i interposcaninput_$samplename.faa
-}
-
 upint=5000
 downint=5000
 query=EFB0058.fa
@@ -163,6 +66,108 @@ while getopts ":u:d:q:g:n:s:h" opt; do
 			;;
 	esac
 done
+
+
+cp ${genomespath}/ genomes_${samplename}
+
+translate( ){
+    mkdir genomes_translated_${samplename}/
+    for i in $(ls genomes_${samplename)/*.fna
+    do
+        prodigal \
+        -p meta \
+        -i ${i} \
+        -o ../genomes_translated_${samplename}/${i}prodigal.txt \
+        -a ../genomes_translated_${samplename}/${i}translated.faa
+    done
+    echo "genomes translated"
+}
+
+makedbs( ){
+    mkdir diamonddbs_${samplename}/
+    for i in $(ls genomes_translated_${samplename}/*.faa)
+    do
+        diamond makedb \
+        --in ${i} \
+        --db ../diamonddbs_${samplename}/${i}.db
+    done
+}
+
+blast( ){
+    mkdir blast_results_30_${samplename}/
+    for i in $(ls diamonddbs_${samplename})
+    do
+        if [ ! -f ../blast_results_30_${samplename}/EFB0058_blast_${i}.txt ]; then
+	        diamond blastp \
+			-d ${i} \
+			--query ../$query \
+			--out ../blast_results_30_$samplename/EFB0058_blast_${i}.txt \
+			--outfmt 6 qseqid sseqid length nident \
+			--max-target-seqs 0 \
+			--id 30
+        fi
+    done
+
+    for i in $(ls blast_results_30_${samplename}/)
+    do
+        cat blast_results_30_${samplename}/${i} >> master${samplename}.txt
+    done
+}
+
+extractcontigs ( ){
+    mkdir EFB0058_ORFS_$samplename/
+    mkdir EFB0058_flanks_$samplename/
+    mkdir bedfiles_$samplename/
+    mkdir contigs_$samplename/
+    mkdir EFB0058_formatted_coordinates_$samplename/
+    mkdir EFB0058_final_coordinates_$samplename/
+
+
+    for i in $(ls genomes_${samplename}/)
+    do
+        if [ -s blast_results_30_${samplename}/EFB0058_blast_${i}translated.faa.db.dmnd.txt ]; then
+            echo ${i}
+            
+			cut -f2 blast_results_30_${samplename}/EFB0058_blast_${i}translated.faa.db.dmnd.txt > EFB0058_ORFS_${samplename}/${i}_EFB0058_ORFs.txt
+            echo "ORF IDs extracted"
+            
+			seqkit grep -f EFB0058_ORFS_${samplename}/${i}_EFB0058_ORFs.txt genomes_translated_${samplename}/${i}translated.faa | seqkit seq -n > EFB0058_ORFS_${samplename}/${i}_EFB0058_hits_coordinates.txt
+            echo "Coordinates extracted"
+            
+			awk 'BEGIN{OFS="\t"} {F="#"} {up=$3; down=$5; if (up>down) print down, up; else print up, down}' EFB0058_ORFS_${samplename}/${i}_EFB0058_hits_coordinates.txt > EFB0058_formatted_coordinates_${samplename}/${i}_EFB0058_formatted_coordinates.txt
+            awk -v upint=$upint -v downint=$downint 'BEGIN{OFS="\t"} {up=$1-upint; down=$2+downint; if (up>0) print up, down; else print 0, down}' EFB0058_formatted_coordinates_${samplename}/${i}_EFB0058_formatted_coordinates.txt > EFB0058_final_coordinates_${samplename}/${i}_EFB0058_final_coordinates.txt
+            echo "Coordinates formatted"
+            
+			cut -f 2 blast_results_30_${samplename}/EFB0058_blast_${i}translated.faa.db.dmnd.txt | cut -f 1 -d "_" > EFB0058_flanks_${samplename}/${i}_EFB0058_contigs.txt
+            echo "Contig names extracted"
+            
+			paste EFB0058_flanks_${samplename}/${i}_EFB0058_contigs.txt EFB0058_final_coordinates_${samplename}/${i}_EFB0058_final_coordinates.txt > bedfiles_${samplename}/${i}.bed
+            echo "Bed file created"
+            
+			seqkit subseq --bed bedfiles_${samplename}/${i}.bed genomes_${samplename}/${i} > contigs_${samplename}/${i}_EFB0058_contigs.fna
+            echo "Contigs created for ${i} with flanks $upint up and $downint down"
+        else
+            echo "File ${i} is empty, skipping..."
+        fi
+    done
+}
+
+contigorfprocessing( ){
+    for i in "$(contigs_${samplename}/*.fna)"
+    do
+        cat ${i} >> allcontigsconcatenated_${samplename}.fna
+    done
+
+    seqkit seq -m 50 allcontigsconcatenated_${samplename}.fna > allcontigsconcatenated_filtered_${samplename}.fna
+    prodigal \
+    -p meta \
+    -i allcontigsconcatenated_filtered_${samplename}.fna \
+    -o allcontigsconcatenated_${samplename}.txt \
+    -a allcontigsconcatenated_${samplename}.faa
+    sed 's/*//g' allcontigsconcatenated_${samplename}.faa > interposcaninput_${samplename}.faa
+    bash my_interproscan/interproscan-*/interproscan.sh -i interposcaninput_${samplename}.faa
+}
+
 
 if [ -z "$genomespath" ]; then
 	echo "Error: Option -g (genomes path) is required." >&2
