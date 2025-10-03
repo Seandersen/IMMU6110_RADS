@@ -72,11 +72,11 @@ cp -r ${genomespath} genomes_${samplename}/
 
 translate( ){
     mkdir genomes_translated_${samplename}/
-    for i in $(ls genomes_${samplename}/*.fna)
+    for i in $(ls genomes_${samplename}/)
     do
         prodigal \
         -p meta \
-        -i ${i} \
+        -i genomes_${samplename}/${i} \
         -o genomes_translated_${samplename}/${i}prodigal.txt \
         -a genomes_translated_${samplename}/${i}translated.faa
     done
@@ -85,28 +85,28 @@ translate( ){
 
 makedbs( ){
     mkdir diamonddbs_${samplename}/
-    for i in $(ls genomes_translated_${samplename}/*.faa)
+    for i in $(ls genomes_translated_${samplename}/)
     do
         diamond makedb \
-        --in ${i} \
+        --in genomes_translated_${samplename}/${i} \
         --db diamonddbs_${samplename}/${i}.db
     done
+	echo "diamond databases generated"
 }
 
 blast( ){
     mkdir blast_results_30_${samplename}/
-    for i in $(ls diamonddbs_${samplename})
+    for i in $(ls diamonddbs_${samplename}/)
     do
-        if [ ! -f blast_results_30_${samplename}/EFB0058_blast_${i}.txt ]; then
-	        diamond blastp \
-			-d ${i} \
-			--query $query \
-			--out blast_results_30_$samplename/EFB0058_blast_${i}.txt \
-			--outfmt 6 qseqid sseqid length nident \
-			--max-target-seqs 0 \
-			--id 30
-        fi
+    	diamond blastp \
+		-d diamonddbs_${samplename}/${i} \
+		--query $query \
+		--out blast_results_30_$samplename/EFB0058_blast_${i}.txt \
+		--outfmt 6 qseqid sseqid length nident \
+		--max-target-seqs 0 \
+		--id 30
     done
+	echo "BLAST for ${query} completed"
 
     for i in $(ls blast_results_30_${samplename}/)
     do
@@ -127,23 +127,23 @@ extractcontigs ( ){
     do
         if [ -s blast_results_30_${samplename}/EFB0058_blast_${i}translated.faa.db.dmnd.txt ]; then
             echo ${i}
-            
+
 			cut -f2 blast_results_30_${samplename}/EFB0058_blast_${i}translated.faa.db.dmnd.txt > EFB0058_ORFS_${samplename}/${i}_EFB0058_ORFs.txt
             echo "ORF IDs extracted"
-            
+
 			seqkit grep -f EFB0058_ORFS_${samplename}/${i}_EFB0058_ORFs.txt genomes_translated_${samplename}/${i}translated.faa | seqkit seq -n > EFB0058_ORFS_${samplename}/${i}_EFB0058_hits_coordinates.txt
             echo "Coordinates extracted"
-            
+
 			awk 'BEGIN{OFS="\t"} {F="#"} {up=$3; down=$5; if (up>down) print down, up; else print up, down}' EFB0058_ORFS_${samplename}/${i}_EFB0058_hits_coordinates.txt > EFB0058_formatted_coordinates_${samplename}/${i}_EFB0058_formatted_coordinates.txt
             awk -v upint=$upint -v downint=$downint 'BEGIN{OFS="\t"} {up=$1-upint; down=$2+downint; if (up>0) print up, down; else print 0, down}' EFB0058_formatted_coordinates_${samplename}/${i}_EFB0058_formatted_coordinates.txt > EFB0058_final_coordinates_${samplename}/${i}_EFB0058_final_coordinates.txt
             echo "Coordinates formatted"
-            
+
 			cut -f 2 blast_results_30_${samplename}/EFB0058_blast_${i}translated.faa.db.dmnd.txt | cut -f 1 -d "_" > EFB0058_flanks_${samplename}/${i}_EFB0058_contigs.txt
             echo "Contig names extracted"
-            
+
 			paste EFB0058_flanks_${samplename}/${i}_EFB0058_contigs.txt EFB0058_final_coordinates_${samplename}/${i}_EFB0058_final_coordinates.txt > bedfiles_${samplename}/${i}.bed
             echo "Bed file created"
-            
+
 			seqkit subseq --bed bedfiles_${samplename}/${i}.bed genomes_${samplename}/${i} > contigs_${samplename}/${i}_EFB0058_contigs.fna
             echo "Contigs created for ${i} with flanks $upint up and $downint down"
         else
@@ -153,7 +153,7 @@ extractcontigs ( ){
 }
 
 contigorfprocessing( ){
-    for i in $(contigs_${samplename}/*.fna)
+    for i in $(ls contigs_${samplename}/)
     do
         cat contigs_${samplename}/${i} >> allcontigsconcatenated_${samplename}.fna
     done
@@ -194,7 +194,8 @@ if $run_all; then
     echo "running entire pipeline..."
     translate
     makedbs
-    extractcontigs
+    blast
+	extractcontigs
     contigorfprocessing
 else
     case "$step" in
