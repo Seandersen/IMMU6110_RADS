@@ -68,17 +68,17 @@ while getopts ":u:d:q:g:n:s:h" opt; do
 done
 
 
-cp ${genomespath}/ genomes_${samplename}
+cp -r ${genomespath} genomes_${samplename}/
 
 translate( ){
     mkdir genomes_translated_${samplename}/
-    for i in $(ls genomes_${samplename)/*.fna
+    for i in $(ls genomes_${samplename}/*.fna)
     do
         prodigal \
         -p meta \
         -i ${i} \
-        -o ../genomes_translated_${samplename}/${i}prodigal.txt \
-        -a ../genomes_translated_${samplename}/${i}translated.faa
+        -o genomes_translated_${samplename}/${i}prodigal.txt \
+        -a genomes_translated_${samplename}/${i}translated.faa
     done
     echo "genomes translated"
 }
@@ -89,7 +89,7 @@ makedbs( ){
     do
         diamond makedb \
         --in ${i} \
-        --db ../diamonddbs_${samplename}/${i}.db
+        --db diamonddbs_${samplename}/${i}.db
     done
 }
 
@@ -97,11 +97,11 @@ blast( ){
     mkdir blast_results_30_${samplename}/
     for i in $(ls diamonddbs_${samplename})
     do
-        if [ ! -f ../blast_results_30_${samplename}/EFB0058_blast_${i}.txt ]; then
+        if [ ! -f blast_results_30_${samplename}/EFB0058_blast_${i}.txt ]; then
 	        diamond blastp \
 			-d ${i} \
-			--query ../$query \
-			--out ../blast_results_30_$samplename/EFB0058_blast_${i}.txt \
+			--query $query \
+			--out blast_results_30_$samplename/EFB0058_blast_${i}.txt \
 			--outfmt 6 qseqid sseqid length nident \
 			--max-target-seqs 0 \
 			--id 30
@@ -153,9 +153,9 @@ extractcontigs ( ){
 }
 
 contigorfprocessing( ){
-    for i in "$(contigs_${samplename}/*.fna)"
+    for i in $(contigs_${samplename}/*.fna)
     do
-        cat ${i} >> allcontigsconcatenated_${samplename}.fna
+        cat contigs_${samplename}/${i} >> allcontigsconcatenated_${samplename}.fna
     done
 
     seqkit seq -m 50 allcontigsconcatenated_${samplename}.fna > allcontigsconcatenated_filtered_${samplename}.fna
