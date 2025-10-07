@@ -165,7 +165,7 @@ contigorfprocessing( ){
     -o allcontigsconcatenated_${samplename}.txt \
     -a allcontigsconcatenated_${samplename}.faa
     sed 's/*//g' allcontigsconcatenated_${samplename}.faa > interproscaninput_${samplename}.faa
-    bash ~/software/my_interproscan/interproscan-*/interproscan.sh -i interproscaninput_${samplename}.faa
+    bash ~/software/interproscan-*/interproscan.sh -i interproscaninput_${samplename}.faa
 }
 
 
